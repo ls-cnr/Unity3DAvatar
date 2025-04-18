@@ -22,6 +22,8 @@ public class SimpleAvatarTest : MonoBehaviour
             var avatarLoader = new AvatarObjectLoader();
             Debug.Log("AvatarObjectLoader disponibile!");
 
+            GetComponent<BackgroundSetup>().SetupBackground();
+
             // Avvia il caricamento senza await
             Debug.Log($"Tentativo di caricamento avatar da URL: {avatarUrl}");
             LoadAvatarNonAsync(avatarUrl);
@@ -47,6 +49,10 @@ public class SimpleAvatarTest : MonoBehaviour
             {
                 avatarObject.transform.SetParent(transform);
                 avatarObject.transform.localPosition = Vector3.zero;
+
+                avatarObject.tag = "Avatar";
+
+                GetComponent<LightingSetup>().SetupLighting(avatarObject);
             }
         };
 
