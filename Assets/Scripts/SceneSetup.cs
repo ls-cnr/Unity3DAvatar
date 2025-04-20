@@ -27,14 +27,14 @@ public class SceneSetup : MonoBehaviour {
     [SerializeField] private Color rimLightColor = Color.white;
     [SerializeField] private float rimLightIntensity = 0.5f;
 
-    private AvatarSetup avatarSetup;
+    private AvatarManager avatarSetup;
 
     void Start() {
         // Verifica che tutti i riferimenti siano stati assegnati
         if (!ValidateReferences()) return;
 
         // Ottieni il componente AvatarSetup
-        avatarSetup = avatarContainer.GetComponent<AvatarSetup>();
+        avatarSetup = avatarContainer.GetComponent<AvatarManager>();
         if (avatarSetup == null) {
             Debug.LogError("Componente AvatarSetup non trovato nel GameObject avatarContainer!");
             return;

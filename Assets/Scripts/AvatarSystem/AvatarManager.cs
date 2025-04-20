@@ -2,8 +2,8 @@ using UnityEngine;
 using ReadyPlayerMe.Core;
 using System;
 
-public class AvatarSetup : MonoBehaviour {
-    [SerializeField] private string avatarUrl = "https://models.readyplayer.me/67617e532104de87ea4aae5e.glb";
+public class AvatarManager : MonoBehaviour {
+    [SerializeField] private string avatarUrl = "https://models.readyplayer.me/67617e532104de87ea4aae5e.glb?morphTargets=ARKit";
     [SerializeField] private RuntimeAnimatorController animatorController;
 
     private GameObject avatarObject;
@@ -24,10 +24,17 @@ public class AvatarSetup : MonoBehaviour {
     private void LoadAvatar(string url) {
         var avatarLoader = new AvatarObjectLoader();
 
+        // Crea una configurazione personalizzata per includere le blend shapes ARKit
+        AvatarConfig config = ScriptableObject.CreateInstance<AvatarConfig>();
+        config.MorphTargets = new System.Collections.Generic.List<string> { "ARKit" };
+
+        // Assegna la configurazione al loader
+        avatarLoader.AvatarConfig = config;
+
         // Callback per completamento
         avatarLoader.OnCompleted += (sender, args) => {
             avatarObject = args.Avatar;
-            Debug.Log("Avatar caricato con successo!");
+            //Debug.Log("Avatar caricato con successo!");
 
             if (avatarObject != null) {
                 avatarObject.transform.SetParent(transform);
@@ -66,7 +73,7 @@ public class AvatarSetup : MonoBehaviour {
 
             // Avvia l'animazione Idle
             animator.Play("Idle", 0, 0f);
-            Debug.Log("Animator Controller applicato con successo!");
+            //Debug.Log("Animator Controller applicato con successo!");
         } else {
             Debug.LogWarning("Nessun Animator Controller assegnato nell'Inspector!");
         }
@@ -76,4 +83,5 @@ public class AvatarSetup : MonoBehaviour {
     public GameObject GetAvatar() {
         return avatarObject;
     }
+
 }
