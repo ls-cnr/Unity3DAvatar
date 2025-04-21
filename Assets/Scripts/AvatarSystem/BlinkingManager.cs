@@ -53,17 +53,6 @@ public class BlinkingManager {
             StartBlinking();
         }
 
-        //Debug.Log("che sonno!");
-        //float weight = 100f * blinkIntensity;
-        //// Applica il valore delle blend shapes per chiudere gli occhi
-        //foreach (string shapeName in eyeBlinkBlendShapes) {
-            
-        //    if (blendShapeHelper.HasBlendShape(shapeName)) {
-        //        Debug.Log($"chiudo {shapeName} for {weight}");
-        //        blendShapeHelper.SetBlendShapeWeight(shapeName, weight);
-        //    }
-        //}
-
     }
 
     /// <summary>
@@ -158,6 +147,7 @@ public class BlinkingManager {
             yield return new WaitForSeconds(Random.Range(minBlinkInterval, maxBlinkInterval));
 
             isBlinking = true;
+            //Debug.Log("blick -> closed");
 
             float weight = 100f * blinkIntensity;
             // Applica il valore delle blend shapes per chiudere gli occhi
@@ -168,12 +158,11 @@ public class BlinkingManager {
      
             }
 
-            Debug.Log("blick -> closed");
 
             // Attendi per mantenere gli occhi chiusi
             yield return new WaitForSeconds(0.15f);
 
-            Debug.Log("blick -> opened");
+            //Debug.Log("blick -> opened");
 
             // Riapri gli occhi
             ResetEyes();

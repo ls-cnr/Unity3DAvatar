@@ -155,8 +155,8 @@ public class BlendShapeHelper {
         //if (weight!=0)
         //    Debug.Log($"[{blendShapeName}] weight is not zero = {weight}");
         if (index >= 0) {
-            if (index==50)
-                Debug.Log($"[{blendShapeName}] weight is not zero = {weight}");
+            //if (index==50)
+                //Debug.Log($"[{blendShapeName}] weight is not zero = {weight}");
             headMeshRenderer.SetBlendShapeWeight(index, weight);
             return true;
         }

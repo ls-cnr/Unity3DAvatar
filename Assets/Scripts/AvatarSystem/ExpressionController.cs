@@ -148,23 +148,24 @@ public class ExpressionController : MonoBehaviour {
             }
         }
 
-        // NOTE TO IMPROVE!!!
-        //// Interpola tutti i valori delle blend shapes
-        //foreach (var shapeName in targetBlendShapeValues.Keys) {
-        //    if (!currentBlendShapeValues.ContainsKey(shapeName)) {
-        //        currentBlendShapeValues[shapeName] = 0f;
-        //    }
+        //NOTE TO IMPROVE!!!
+        // Interpola tutti i valori delle blend shapes
+        if (!blinkingManager.IsBlinking())
+            foreach (var shapeName in targetBlendShapeValues.Keys) {
+                if (!currentBlendShapeValues.ContainsKey(shapeName)) {
+                    currentBlendShapeValues[shapeName] = 0f;
+                }
 
-        //    // Interpola il valore corrente verso il valore target
-        //    currentBlendShapeValues[shapeName] = Mathf.Lerp(
-        //        currentBlendShapeValues[shapeName],
-        //        targetBlendShapeValues[shapeName],
-        //        Time.deltaTime * transitionSpeed
-        //    );
+                // Interpola il valore corrente verso il valore target
+                currentBlendShapeValues[shapeName] = Mathf.Lerp(
+                    currentBlendShapeValues[shapeName],
+                    targetBlendShapeValues[shapeName],
+                    Time.deltaTime * transitionSpeed
+                );
 
-        //    // Applica il valore alla blend shape
-        //    // blendShapeHelper.SetBlendShapeWeight(shapeName, currentBlendShapeValues[shapeName]);
-        //}
+                // Applica il valore alla blend shape
+                blendShapeHelper.SetBlendShapeWeight(shapeName, currentBlendShapeValues[shapeName]);
+            }
     }
 
     /// <summary>
