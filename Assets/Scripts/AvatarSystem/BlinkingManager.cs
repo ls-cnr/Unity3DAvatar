@@ -1,210 +1,165 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Gestisce l'animazione del battito delle palpebre per un avatar.
+/// Gestisce il battito delle palpebre per l'avatar.
 /// </summary>
-public class BlinkingManager {
-    // Configurazione del battito delle palpebre
-    private float blinkIntensity;
-    private float minBlinkInterval;
-    private float maxBlinkInterval;
-    private bool enableBlinking;
-
-    // Riferimento agli strumenti necessari
-    private readonly BlendShapeHelper blendShapeHelper;
-    private readonly MonoBehaviour coroutineRunner;
-
-    // Stato interno
-    private Coroutine blinkCoroutine;
+public class BlinkingManager
+{
+    // Riferimento al BlendShapeHelper
+    private BlendShapeHelper blendShapeHelper;
+    
+    // Riferimento al MonoBehaviour per le coroutine
+    private MonoBehaviour coroutineHost;
+    
+    // Parametri di configurazione
+    private float minBlinkInterval = 2.0f;
+    private float maxBlinkInterval = 6.0f;
+    
+    // Stato corrente
+    private bool isEnabled = false;
     private bool isBlinking = false;
-
-    // Nomi standard delle blend shapes per le palpebre
-    private readonly string[] eyeBlinkBlendShapes = new string[] { "eyeBlinkLeft", "eyeBlinkRight" };
-
+    
+    // Coroutine di blinking
+    private Coroutine blinkingCoroutine = null;
+    
+    // Animazione di blink corrente
+    private BlinkAnimation currentBlinkAnimation = null;
+    
+    // Scheduler per le animazioni
+    private AnimationScheduler animationScheduler;
+    
     /// <summary>
-    /// Crea una nuova istanza del BlinkingManager.
+    /// Costruttore del BlinkingManager.
     /// </summary>
-    /// <param name="blendShapeHelper">Il BlendShapeHelper da utilizzare per manipolare le blend shapes.</param>
-    /// <param name="coroutineRunner">Un MonoBehaviour che può eseguire coroutine.</param>
-    /// <param name="intensity">L'intensità del battito delle palpebre (0-1).</param>
-    /// <param name="minInterval">L'intervallo minimo tra i battiti (secondi).</param>
-    /// <param name="maxInterval">L'intervallo massimo tra i battiti (secondi).</param>
-    /// <param name="enable">Se abilitare il battito delle palpebre all'inizio.</param>
-
-    public BlinkingManager(
-        BlendShapeHelper blendShapeHelper,
-        MonoBehaviour coroutineRunner,
-        float intensity = 0.03f,
-        float minInterval = 2.0f,
-        float maxInterval = 6.0f,
-        bool enable = true)
+    /// <param name="blendShapeHelper">Helper per le blend shapes</param>
+    /// <param name="coroutineHost">MonoBehaviour su cui eseguire le coroutine</param>
+    /// <param name="blinkIntensity">Intensità del battito delle palpebre</param>
+    /// <param name="minBlinkInterval">Intervallo minimo tra battiti (secondi)</param>
+    /// <param name="maxBlinkInterval">Intervallo massimo tra battiti (secondi)</param>
+    /// <param name="startEnabled">Se abilitare il battito all'avvio</param>
+    public BlinkingManager(BlendShapeHelper blendShapeHelper, MonoBehaviour coroutineHost, AnimationScheduler scheduler)
     {
         this.blendShapeHelper = blendShapeHelper;
-        this.coroutineRunner = coroutineRunner;
-        this.blinkIntensity = Mathf.Clamp(intensity, 0f, 0.1f);
-        this.minBlinkInterval = minInterval;
-        this.maxBlinkInterval = maxInterval;
-        this.enableBlinking = enable;
-
-        // Avvia il battito delle palpebre se abilitato
-        if (enable) {
-            StartBlinking();
-        }
-
+        this.coroutineHost = coroutineHost;
+        this.animationScheduler = scheduler;
+        
+        StartBlinking();
     }
-
+    
     /// <summary>
-    /// Avvia l'animazione del battito delle palpebre.
+    /// Avvia il battito delle palpebre automatico.
     /// </summary>
-    public void StartBlinking() {
-        //Debug.Log("BlinkingManager: Avvio del battito delle palpebre");
-
-        // Verifica se il BlendShapeHelper è inizializzato
-        if (!blendShapeHelper.IsInitialized()) {
-            Debug.LogWarning("BlinkingManager: Impossibile avviare il battito delle palpebre. BlendShapeHelper non inizializzato.");
+    public void StartBlinking()
+    {
+        if (isEnabled)
             return;
-        }
-
-        // Ferma qualsiasi coroutine esistente
-        StopBlinking();
-
-        // Abilita il blinking
-        enableBlinking = true;
-
-        // Avvia la coroutine per il battito delle palpebre
-        blinkCoroutine = coroutineRunner.StartCoroutine(BlinkingRoutine());
-    }
-
-    /// <summary>
-    /// Ferma l'animazione del battito delle palpebre.
-    /// </summary>
-    public void StopBlinking() {
-        enableBlinking = false;
-
-        // Ferma la coroutine se è in esecuzione
-        if (blinkCoroutine != null) {
-            coroutineRunner.StopCoroutine(blinkCoroutine);
-            blinkCoroutine = null;
-
-            // Assicurati che gli occhi siano aperti
-            ResetEyes();
+            
+        isEnabled = true;
+        
+        // Avvia la coroutine di blinking
+        if (coroutineHost != null && blinkingCoroutine == null)
+        {
+            blinkingCoroutine = coroutineHost.StartCoroutine(BlinkingCoroutine());
         }
     }
-
+    
     /// <summary>
-    /// Imposta l'intensità del battito delle palpebre.
+    /// Ferma il battito delle palpebre automatico.
     /// </summary>
-    /// <param name="intensity">L'intensità del battito (0-0.1).</param>
-    public void SetBlinkIntensity(float intensity) {
-        blinkIntensity = Mathf.Clamp(intensity, 0f, 0.1f);
-    }
-
-    /// <summary>
-    /// Imposta l'intervallo tra i battiti delle palpebre.
-    /// </summary>
-    /// <param name="minInterval">L'intervallo minimo (secondi).</param>
-    /// <param name="maxInterval">L'intervallo massimo (secondi).</param>
-    public void SetBlinkInterval(float minInterval, float maxInterval) {
-        this.minBlinkInterval = Mathf.Max(0.5f, minInterval);
-        this.maxBlinkInterval = Mathf.Max(this.minBlinkInterval + 0.5f, maxInterval);
-    }
-
-    /// <summary>
-    /// Verifica se una specifica espressione può essere compatibile con il battito delle palpebre.
-    /// </summary>
-    /// <param name="expressionType">Il tipo di espressione da verificare.</param>
-    /// <returns>True se il battito delle palpebre è compatibile con l'espressione.</returns>
-    public bool IsCompatibleWithExpression(ExpressionMapping.ExpressionType expressionType) {
-        // Espressioni compatibili con il battito delle palpebre
-        // In generale, espressioni che non coinvolgono in modo significativo gli occhi
-        switch (expressionType) {
-            case ExpressionMapping.ExpressionType.Neutral:
-            case ExpressionMapping.ExpressionType.Happy:
-                return true;
-
-            case ExpressionMapping.ExpressionType.Sad:
-            case ExpressionMapping.ExpressionType.Angry:
-            case ExpressionMapping.ExpressionType.Surprised:
-            case ExpressionMapping.ExpressionType.Fearful:
-            case ExpressionMapping.ExpressionType.Disgusted:
-                return false;
-
-            default:
-                return false;
+    public void StopBlinking()
+    {
+        if (!isEnabled)
+            return;
+            
+        isEnabled = false;
+        
+        // Ferma la coroutine di blinking
+        if (coroutineHost != null && blinkingCoroutine != null)
+        {
+            coroutineHost.StopCoroutine(blinkingCoroutine);
+            blinkingCoroutine = null;
         }
     }
-
+        
     /// <summary>
-    /// Coroutine che gestisce l'animazione del battito delle palpebre.
+    /// Coroutine che gestisce il battito delle palpebre a intervalli casuali.
     /// </summary>
-    private IEnumerator BlinkingRoutine() {
-        //Debug.Log("BlinkingManager: Esecuzione della routine di blinking");
-
-        while (enableBlinking) {
-            // Attendi un intervallo casuale prima del prossimo battito
-            yield return new WaitForSeconds(Random.Range(minBlinkInterval, maxBlinkInterval));
-
-            isBlinking = true;
-            //Debug.Log("blick -> closed");
-
-            float weight = 100f * blinkIntensity;
-            // Applica il valore delle blend shapes per chiudere gli occhi
-            foreach (string shapeName in eyeBlinkBlendShapes) {
-                if (blendShapeHelper.HasBlendShape(shapeName)) {
-                     blendShapeHelper.SetBlendShapeWeight(shapeName, weight);
-                }
-     
-            }
-
-
-            // Attendi per mantenere gli occhi chiusi
-            yield return new WaitForSeconds(0.15f);
-
-            //Debug.Log("blick -> opened");
-
-            // Riapri gli occhi
-            ResetEyes();
-
-
-            isBlinking = false;
+    private IEnumerator BlinkingCoroutine()
+    {
+        while (isEnabled)
+        {
+            // Attende un intervallo casuale
+            float interval = UnityEngine.Random.Range(minBlinkInterval, maxBlinkInterval);
+            yield return new WaitForSeconds(interval);
+            
+            // Verifica se è ancora abilitato
+            if (!isEnabled)
+                break;
+                
+            // Crea e schedula un'animazione di blink
+            CreateAndScheduleBlinkAnimation();
         }
+        
+        blinkingCoroutine = null;
     }
-
-    ///// <summary>
-    ///// Forza un battito di palpebre immediato.
-    ///// </summary>
-    //public void ForceBlink() {
-    //    if (!enableBlinking || isBlinking) return;
-
-    //    coroutineRunner.StartCoroutine(Blink());
-    //}
-
+    
     /// <summary>
-    /// Ripristina gli occhi alla posizione aperta.
+    /// Crea e schedula un'animazione di battito delle palpebre.
     /// </summary>
-    private void ResetEyes() {
-        foreach (string shapeName in eyeBlinkBlendShapes) {
-            if (blendShapeHelper.HasBlendShape(shapeName)) {
-                blendShapeHelper.SetBlendShapeWeight(shapeName, 0f);
-            }
-        }
+    private void CreateAndScheduleBlinkAnimation()
+    {
+        // Crea una nuova animazione di blink
+        currentBlinkAnimation = new BlinkAnimation();
+        
+        // Schedula l'animazione
+        animationScheduler.EnqueueAnimation(currentBlinkAnimation);
+        
+        // Imposta lo stato di blinking
+        isBlinking = true;
+        
+        // Avvia una coroutine per resettare lo stato dopo la durata del blink
+        coroutineHost.StartCoroutine(ResetBlinkingState(0.3f)); // Durata totale del blink (incluse transizioni)
     }
-
+    
+    /// <summary>
+    /// Coroutine per resettare lo stato di blinking dopo un certo tempo.
+    /// </summary>
+    private IEnumerator ResetBlinkingState(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        isBlinking = false;
+        currentBlinkAnimation = null;
+    }
+    
+    /// <summary>
+    /// Imposta gli intervalli del battito delle palpebre.
+    /// </summary>
+    /// <param name="minInterval">L'intervallo minimo in secondi</param>
+    /// <param name="maxInterval">L'intervallo massimo in secondi</param>
+    public void SetBlinkIntervals(float minInterval, float maxInterval)
+    {
+        minBlinkInterval = Mathf.Max(0.5f, minInterval);
+        maxBlinkInterval = Mathf.Max(minBlinkInterval + 0.5f, maxInterval);
+    }
+    
     /// <summary>
     /// Verifica se il battito delle palpebre è attualmente abilitato.
     /// </summary>
-    /// <returns>True se il battito è abilitato, false altrimenti.</returns>
-    public bool IsEnabled() {
-        return enableBlinking;
+    /// <returns>True se abilitato, false altrimenti</returns>
+    public bool IsEnabled()
+    {
+        return isEnabled;
     }
-
+    
     /// <summary>
-    /// Verifica se l'avatar sta attualmente battendo le palpebre.
+    /// Verifica se è in corso un battito delle palpebre.
     /// </summary>
-    /// <returns>True se l'avatar sta battendo le palpebre, false altrimenti.</returns>
-    public bool IsBlinking() {
+    /// <returns>True se è in corso un battito, false altrimenti</returns>
+    public bool IsBlinking()
+    {
         return isBlinking;
     }
 }
