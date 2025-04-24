@@ -15,15 +15,14 @@ public class FearfulState : ExpressionState {
     /// </summary>
     private Dictionary<string, float> expressionValues = new Dictionary<string, float>()
     {
-        { "eyeWideLeft", 0.5f },
-        { "eyeWideRight", 0.5f },
-        { "browInnerUp", 0.3f },
-        { "browOuterUpLeft", 0.15f },
-        { "browOuterUpRight", 0.15f },
-        { "mouthStretchLeft", 0.3f },
-        { "mouthStretchRight", 0.3f }
+        { "eyeWideLeft", 0.6f },
+        { "eyeWideRight", 0.6f },
+        { "browInnerUp", 0.5f },
+        { "browOuterUpLeft", 0.5f },
+        { "browOuterUpRight", 0.5f },
+        { "jawOpen", 0.4f },
+        { "mouthOpen", 0.4f }
     };
-
     /// <summary>
     /// Ottiene i valori correnti delle blend shapes.
     /// </summary>

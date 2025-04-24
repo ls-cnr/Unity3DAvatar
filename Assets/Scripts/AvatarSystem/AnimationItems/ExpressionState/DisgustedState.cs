@@ -8,7 +8,7 @@ public class DisgustedState : ExpressionState {
     /// <summary>
     /// L'intensità dell'espressione.
     /// </summary>
-    private float intensity = 0.005f;
+    private float intensity = 0.016f;
     
     /// <summary>
     /// I valori delle blend shapes per questa espressione.
@@ -23,7 +23,15 @@ public class DisgustedState : ExpressionState {
         { "browDownLeft", 0.4f },
         { "browDownRight", 0.4f }
     };
-
+    // {
+    //     { "noseSneerLeft", 0.6f },
+    //     { "noseSneerRight", 0.6f },
+    //     { "mouthLeft", 0.4f },
+    //     { "cheekSquintLeft", 0.4f },
+    //     { "cheekSquintRight", 0.4f },
+    //     { "browDownLeft", 0.4f },
+    //     { "browDownRight", 0.4f }
+    // };
     /// <summary>
     /// Ottiene i valori correnti delle blend shapes.
     /// </summary>

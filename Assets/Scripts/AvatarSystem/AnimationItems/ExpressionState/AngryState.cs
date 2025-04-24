@@ -8,7 +8,7 @@ public class AngryState : ExpressionState {
     /// <summary>
     /// L'intensità dell'espressione.
     /// </summary>
-    private float intensity = 0.005f;
+    private float intensity = 0.012f;
     
     /// <summary>
     /// I valori delle blend shapes per questa espressione.

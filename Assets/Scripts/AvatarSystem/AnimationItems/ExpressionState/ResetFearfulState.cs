@@ -8,6 +8,7 @@ public class ResetFearfulState : ExpressionState {
     /// <summary>
     /// L'intensità dell'espressione.
     /// </summary>
+
     private float intensity = 0f;
     
     /// <summary>
@@ -20,8 +21,8 @@ public class ResetFearfulState : ExpressionState {
         { "browInnerUp", 0f },
         { "browOuterUpLeft", 0f },
         { "browOuterUpRight", 0f },
-        { "mouthStretchLeft", 0f },
-        { "mouthStretchRight", 0f }
+        { "jawOpen", 0f },
+        { "mouthOpen", 0f }
     };
 
     /// <summary>

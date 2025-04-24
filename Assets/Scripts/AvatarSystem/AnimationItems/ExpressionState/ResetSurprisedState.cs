@@ -10,9 +10,6 @@ public class ResetSurprisedState : ExpressionState {
     /// </summary>
     private float intensity = 0f;
     
-    /// <summary>
-    /// I valori delle blend shapes per questa espressione.
-    /// </summary>
     private Dictionary<string, float> expressionValues = new Dictionary<string, float>()
     {
         { "eyeWideLeft", 0f },
@@ -20,8 +17,8 @@ public class ResetSurprisedState : ExpressionState {
         { "browInnerUp", 0f },
         { "browOuterUpLeft", 0f },
         { "browOuterUpRight", 0f },
-        { "jawOpen", 0f },
-        { "mouthOpen", 0f }
+        { "mouthStretchLeft", 0f },
+        { "mouthStretchRight", 0f }
     };
 
     /// <summary>
