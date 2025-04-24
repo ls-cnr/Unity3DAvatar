@@ -34,6 +34,8 @@ public class AnimationScheduler
             animationQueue.Insert(insertIndex, animation);
             
         }
+
+        Debug.Log("Animazione Inserita!");
     }
     
     /// Preleva la prossima animazione dalla coda.

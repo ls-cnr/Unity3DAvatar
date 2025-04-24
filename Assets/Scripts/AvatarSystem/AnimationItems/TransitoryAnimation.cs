@@ -34,17 +34,17 @@ public abstract class TransitoryAnimation : FaceAnimationItem {
     public override IEnumerator AnimationCoroutine(Dictionary<string, float> currentBlendShapeValues, BlendShapeHelper blendShapeHelper) {
         started = true;
 
-        Debug.Log("animazione iniziata");
+        //Debug.Log("animazione iniziata");
         ExpressionState entryTargetState = GetEntryExpressionState();
         Dictionary<string, float> entryTargetBlendShapeValues = entryTargetState.GetBlendShapeValues();
         float entryAnimationDuration = GetEntryAnimationDuration();
         
         yield return InterpolationCoroutine(currentBlendShapeValues,entryTargetBlendShapeValues,entryAnimationDuration,blendShapeHelper);
-        Debug.Log("fase 1 finita");
+        //Debug.Log("fase 1 finita");
 
         yield return new WaitForSeconds(HoldTime());
 
-        Debug.Log("fase 2 inziata");
+        //Debug.Log("fase 2 inziata");
 
         ExpressionState exitTargetState = GetExitExpressionState();
         Dictionary<string, float> exitTargetBlendShapeValues = exitTargetState.GetBlendShapeValues();
@@ -53,7 +53,7 @@ public abstract class TransitoryAnimation : FaceAnimationItem {
         yield return InterpolationCoroutine(entryTargetBlendShapeValues,exitTargetBlendShapeValues,exitAnimationDuration,blendShapeHelper);
 
         terminated = true;
-        Debug.Log("animazione conclusa");
+        //Debug.Log("animazione conclusa");
     }
 
 }

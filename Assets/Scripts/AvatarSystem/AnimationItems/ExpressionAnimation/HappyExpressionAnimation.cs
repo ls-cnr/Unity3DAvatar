@@ -12,10 +12,10 @@ public class HappyExpressionAnimation : TransitoryAnimation {
         return new HappyState();
     }
     public override float HoldTime() {
-        return 3f;
+        return 5f;
     }
     public override ExpressionState GetExitExpressionState() {
-        return new NeutralState();
+        return new ResetHappyState();
     }
 
 }

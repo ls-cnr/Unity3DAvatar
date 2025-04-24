@@ -16,6 +16,6 @@ public class AngryExpressionAnimation : TransitoryAnimation {
         return 3f;
     }
     public override ExpressionState GetExitExpressionState() {
-        return new NeutralState();
+        return new ResetAngryState();
     }
 }

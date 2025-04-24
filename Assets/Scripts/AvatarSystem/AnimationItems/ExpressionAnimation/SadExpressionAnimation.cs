@@ -13,9 +13,9 @@ public class SadExpressionAnimation : TransitoryAnimation {
         return new SadState();
     }
     public override float HoldTime() {
-        return 1f;
+        return 5f;
     }
     public override ExpressionState GetExitExpressionState() {
-        return new NeutralState();
+        return new ResetSadState();
     }
 }

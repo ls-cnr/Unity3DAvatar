@@ -17,7 +17,7 @@ public class SurprisedExpressionAnimation : TransitoryAnimation {
         return 3f;
     }
     public override ExpressionState GetExitExpressionState() {
-        return new NeutralState();
+        return new ResetSurprisedState();
     }
 
 }

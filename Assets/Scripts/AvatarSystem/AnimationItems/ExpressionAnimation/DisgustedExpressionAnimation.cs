@@ -17,7 +17,7 @@ public class DisgustedExpressionAnimation : TransitoryAnimation {
         return 3f;
     }
     public override ExpressionState GetExitExpressionState() {
-        return new NeutralState();
+        return new ResetDisgustedState();
     }
 
 }

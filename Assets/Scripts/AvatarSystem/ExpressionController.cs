@@ -8,14 +8,14 @@ using UnityEngine;
 public class ExpressionController : MonoBehaviour
 {
    
-    [Header("Expression Settings")]
-    [Tooltip("Espressione corrente dell'avatar")]
-    [SerializeField] private ExpressionState.ExpressionType currentExpression = ExpressionState.ExpressionType.Neutral;
+    // [Header("Expression Settings")]
+    // [Tooltip("Espressione corrente dell'avatar")]
+    // [SerializeField] private ExpressionState.ExpressionType currentExpression = ExpressionState.ExpressionType.Neutral;
 
     [Header("Blink Settings")]
     [Tooltip("Abilitare il battito delle palpebre automatico")]
     [SerializeField] private bool enableBlinking = true;
-    
+
     // Riferimenti ai componenti di supporto
     private AvatarManager avatarManager;
     private AnimationScheduler animationScheduler;
@@ -23,7 +23,7 @@ public class ExpressionController : MonoBehaviour
     private BlinkingManager blinkingManager;
     
     // Animazione correntemente attiva
-    private ExpressionState currentState = new NeutralState();
+    private ExpressionState idle_face_state = new NeutralState();
     private FaceAnimationItem currentAnimation;
     private Coroutine currentAnimationCoroutine;
     
@@ -69,12 +69,12 @@ public class ExpressionController : MonoBehaviour
         
         // Inizializza il BlinkingManager
         blinkingManager = new BlinkingManager(blendShapeHelper, this, animationScheduler);
-        
+
         // Configura le impostazioni iniziali del blinking
         ConfigureBlinking(enableBlinking);
         
         // Imposta l'espressione iniziale
-        SetCurrentExpression(currentExpression);
+        //SetCurrentExpression(currentExpression);
         
         Debug.Log("ExpressionController: Inizializzazione completata con successo.");
     }
@@ -108,7 +108,7 @@ public class ExpressionController : MonoBehaviour
         
         // Imposta e inizializza la nuova animazione
         currentAnimation = animation;
-        IEnumerator coroutine = animation.AnimationCoroutine(currentState.GetBlendShapeValues(),blendShapeHelper);
+        IEnumerator coroutine = animation.AnimationCoroutine(idle_face_state.GetBlendShapeValues(),blendShapeHelper);
         currentAnimationCoroutine = StartCoroutine(coroutine);    
     }
     
@@ -158,7 +158,7 @@ public class ExpressionController : MonoBehaviour
     public void SetCurrentExpression(ExpressionState.ExpressionType expressionType)
     {
         // Aggiorna la variabile serializzata
-        currentExpression = expressionType;
+        //currentExpression = expressionType;
         
         // Crea e pianifica la nuova animazione
         FaceAnimationItem animation = FaceAnimationItem.GetTransitoryTo(expressionType);
@@ -166,14 +166,14 @@ public class ExpressionController : MonoBehaviour
     }
     
     
-    /// <summary>
-    /// Ottiene l'espressione corrente.
-    /// </summary>
-    /// <returns>L'espressione corrente</returns>
-    public ExpressionState.ExpressionType GetCurrentExpression()
-    {
-        return currentExpression;
-    }
+    // /// <summary>
+    // /// Ottiene l'espressione corrente.
+    // /// </summary>
+    // /// <returns>L'espressione corrente</returns>
+    // public ExpressionState.ExpressionType GetCurrentExpression()
+    // {
+    //     return currentExpression;
+    // }
     
     /// <summary>
     /// Abilita o disabilita il battito delle palpebre.
