@@ -184,5 +184,10 @@ public class ExpressionController : MonoBehaviour
         enableBlinking = enable;
     }
     
+    public AnimationScheduler GetScheduler()
+    {
+        return animationScheduler;
+    }
+    
     #endregion
 }
