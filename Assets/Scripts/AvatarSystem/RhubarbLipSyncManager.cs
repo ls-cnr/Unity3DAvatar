@@ -318,7 +318,7 @@ public class RhubarbLipSyncManager : MonoBehaviour
             Debug.Log("aggiungendo lipsync");
             
             // Crea l'animazione di sincronizzazione labiale
-            RhubarbLipSyncAnimation lipSyncAnimation = new RhubarbLipSyncAnimation(audioClip, lipsyncJson);
+            RhubarbLipSyncAnimation lipSyncAnimation = new RhubarbLipSyncAnimation(audioSource, audioClip, lipsyncJson);
             
             // Aggiungi l'animazione allo scheduler
             animationScheduler.EnqueueAnimation(lipSyncAnimation);

@@ -3,6 +3,10 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+using System.IO;
+using UnityEngine.Networking;
+
+
 /// Controllore principale per le espressioni facciali che utilizza un sistema di schedulazione delle animazioni.
 /// Coordina l'intero sistema di animazioni facciali dell'avatar.
 public class ExpressionController : MonoBehaviour
@@ -15,6 +19,9 @@ public class ExpressionController : MonoBehaviour
     [Header("Blink Settings")]
     [Tooltip("Abilitare il battito delle palpebre automatico")]
     [SerializeField] private bool enableBlinking = true;
+
+    [Header("Audio Source Configuration")]
+    [SerializeField] private AudioSource audioSource;
 
     // Riferimenti ai componenti di supporto
     private AvatarManager avatarManager;
@@ -53,7 +60,7 @@ public class ExpressionController : MonoBehaviour
             OnAvatarLoaded(avatarManager.GetAvatar());
         }
     }
-    
+
     /// Handler per l'evento di caricamento dell'avatar.
     private void OnAvatarLoaded(GameObject avatar)
     {
@@ -72,12 +79,63 @@ public class ExpressionController : MonoBehaviour
 
         // Configura le impostazioni iniziali del blinking
         ConfigureBlinking(enableBlinking);
-        
-        // Imposta l'espressione iniziale
-        //SetCurrentExpression(currentExpression);
-        
+
+        StartCoroutine(LoadAndPlayAudio());
+
         Debug.Log("ExpressionController: Inizializzazione completata con successo.");
     }
+
+    private IEnumerator LoadAndPlayAudio()
+    {
+        string dataPath = Path.Combine(Application.persistentDataPath, "LipsyncData");
+        string audioFilePath = Path.Combine(dataPath, "voice_test.mp3");
+        
+        // Verifica che la directory esista
+        if (!Directory.Exists(dataPath))
+        {
+            Debug.LogError($"Directory non trovata: {dataPath}");
+            yield break;
+        }
+        
+        // Verifica che il file esista
+        if (!File.Exists(audioFilePath))
+        {
+            Debug.LogError($"File audio non trovato: {audioFilePath}");
+            yield break;
+        }
+        
+        // Costruisci l'URI del file con il prefisso file://
+        string audioFileUri = "file://" + audioFilePath;
+        Debug.Log($"Caricamento audio da: {audioFileUri}");
+        
+        // Utilizza UnityWebRequest per caricare l'audio
+        using (UnityWebRequest request = UnityWebRequestMultimedia.GetAudioClip(audioFileUri, AudioType.MPEG))
+        {
+            yield return request.SendWebRequest();
+            
+            if (request.result != UnityWebRequest.Result.Success)
+            {
+                Debug.LogError($"Errore nel caricamento dell'audio: {request.error}");
+                yield break;
+            }
+            
+            AudioClip audioClip = DownloadHandlerAudioClip.GetContent(request);
+            
+            if (audioClip == null)
+            {
+                Debug.LogError("AudioClip è null dopo il caricamento");
+                yield break;
+            }
+            
+            Debug.Log($"Audio caricato con successo: {audioClip.length} secondi");
+
+            string jsonFilePath = Path.Combine(dataPath, "voice_test.json");
+            string lipsyncJson = File.ReadAllText(jsonFilePath);
+        
+            RhubarbLipSyncAnimation lipSyncAnimation = new RhubarbLipSyncAnimation(audioSource, audioClip, lipsyncJson);
+            animationScheduler.EnqueueAnimation(lipSyncAnimation);
+        }
+    }    
     
     /// Aggiornamento del controller ad ogni frame.
     private void Update()
