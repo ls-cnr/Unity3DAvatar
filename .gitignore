@@ -1,58 +1,33 @@
-# Unity generated
-[Ll]ibrary/
-[Tt]emp/
-[Oo]bj/
-[Bb]uild/
-[Bb]uilds/
-[Ll]ogs/
-[Uu]ser[Ss]ettings/
-[Mm]emoryCaptures/
+#Python related settings
+**/__pycache__/
+**.py
+!__init__.py
+!convertlrasd.py
+!conversixdrepnet.py
 
-# Asset meta data should only be ignored when the corresponding asset is also ignored
-![Aa]ssets/**/*.meta
+#ML models related settings
+**.onnx
+**.pth
+**.model
+**.onnx.meta
 
-# Visual Studio / Rider / VS Code
-.vs/
-.idea/
+#Unity related settings
+**/[Ll]ibrary/
+**/[Tt]emp/
+**/[Oo]bj/
+**/[Bb]uild/
+**/[Bb]uilds/
+**/[Ll]ogs/
+**/[Uu]ser[Ss]ettings/
 .vscode/
-*.csproj
-*.unityproj
-*.sln
-*.suo
-*.tmp
-*.user
-*.userprefs
-*.pidb
-*.booproj
-*.svd
-*.pdb
-*.mdb
-*.opendb
-*.VC.db
-
-# Unity3D generated meta files
-*.pidb.meta
-*.pdb.meta
-*.mdb.meta
-
-# Unity3D generated file on crash reports
-sysinfo.txt
-
-# Builds
-*.apk
-*.aab
-*.unitypackage
-*.app
-
-# OS generated
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-Icon?
-ehthumbs.db
-Thumbs.db
-
-# Crashlytics generated file
-crashlytics-build.properties
+**/Assets/Nuget/
+**/Assets/Packages/
+**/Assets/StreamingAssets/
+**/ProjectSettings/Packages/
+StreamingAssets.meta
+Packages.meta
+packages.config
+packages.config.meta
+NuGet.config
+NuGet.config.meta
+NuGet.meta
