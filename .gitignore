@@ -3,7 +3,7 @@
 **.py
 !__init__.py
 !convertlrasd.py
-!conversixdrepnet.py
+!convertsixdrepnet.py
 
 #ML models related settings
 **.onnx
