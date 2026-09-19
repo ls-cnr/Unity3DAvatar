@@ -27,6 +27,10 @@ public class AudioCapture : MonoBehaviour
 
     [Header("Settings")]
 
+    [Tooltip("Select the microphone device by name to ensure the correct mic is used.")]
+    [MicrophoneDeviceSelector] // <-- Custom dropdown attribute
+    public string selectedMicrophoneName = "";
+
     [Tooltip("Microphone gain multiplier. Adjust based on environment noise.")]
     public float micGain = 10f;
 
@@ -100,7 +104,7 @@ public class AudioCapture : MonoBehaviour
     /// </summary>
     void Start()
     {
-        device = Microphone.devices[0];
+        device = ResolveMicrophoneDevice(selectedMicrophoneName);
         UnityEngine.Debug.Log($"Using microphone: {device}");
 
         // Allocate buffers
@@ -139,6 +143,39 @@ public class AudioCapture : MonoBehaviour
     // =========================================================================
     // PUBLIC API
     // =========================================================================
+
+
+    /// <summary>
+    /// Resolves the inspector string to a valid microphone device name.
+    /// </summary>
+    private string ResolveMicrophoneDevice(string selectedName)
+    {
+        string[] devices = Microphone.devices;
+        
+        if (devices.Length == 0)
+        {
+            UnityEngine.Debug.LogError("[AudioCapture] No microphones found on this system!");
+            return "";
+        }
+
+        if (!string.IsNullOrEmpty(selectedName))
+        {
+            foreach (string dev in devices)
+            {
+                if (dev == selectedName)
+                {
+                    return dev; // Exact match found
+                }
+            }
+            UnityEngine.Debug.LogWarning($"[AudioCapture] Selected microphone '{selectedName}' not found. Falling back to default.");
+        }
+        else
+        {
+            UnityEngine.Debug.LogWarning("[AudioCapture] No microphone selected in Inspector. Falling back to default.");
+        }
+
+        return devices[0]; // Safe fallback to the first available microphone
+    }
 
     /// <summary>
     /// Checks if the buffer contains a full second of audio.

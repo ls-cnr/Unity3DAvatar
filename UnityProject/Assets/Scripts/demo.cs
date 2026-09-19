@@ -32,9 +32,10 @@ public class demoMain : MonoBehaviour
     [Tooltip("Avatar that will look at the engaged user.")]
     public AvatarHeadController avatarController;
 
-    [Header("Camera")]
-    [Tooltip("Which camera device to use (0 = default).")]
-    public int cameraIndex = 0;
+    [Header("Camera Settings")]
+    [Tooltip("Select the webcam to use")]
+    [WebcamDeviceSelector]
+    public string selectedCameraName;
 
     [Tooltip("UI RawImage to display the camera feed.")]
     public RawImage displayImage;
@@ -138,11 +139,42 @@ public class demoMain : MonoBehaviour
     /// </summary>
     void Start()
     {
-        // Initialize camera
-        capture = new VideoCapture(cameraIndex);
+        // --- NEW: Resolve the selected camera NAME to an OpenCV INDEX ---
+        int openCvCameraIndex = 0; // Default fallback
+
+        if (!string.IsNullOrEmpty(selectedCameraName))
+        {
+            WebCamDevice[] devices = WebCamTexture.devices;
+            bool found = false;
+
+            for (int i = 0; i < devices.Length; i++)
+            {
+                if (devices[i].name == selectedCameraName)
+                {
+                    openCvCameraIndex = i;
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found)
+            {
+                UnityEngine.Debug.LogWarning($"[Camera] Selected camera '{selectedCameraName}' not found in system. Falling back to index 0.");
+            }
+        }
+        else
+        {
+            UnityEngine.Debug.LogWarning("[Camera] No camera name selected in Inspector. Falling back to index 0.");
+        }
+
+        UnityEngine.Debug.Log($"[Camera] Attempting to open OpenCV VideoCapture at index: {openCvCameraIndex}");
+
+        // Initialize OpenCV camera with the resolved index
+        capture = new VideoCapture(openCvCameraIndex);
+        
         if (!capture.IsOpened())
         {
-            UnityEngine.Debug.LogError($"Camera {cameraIndex} initialization failed.");
+            UnityEngine.Debug.LogError($"[Camera] Camera initialization failed at index {openCvCameraIndex}. Check if another app is using it, or select a different camera in the Inspector.");
             return;
         }
 
