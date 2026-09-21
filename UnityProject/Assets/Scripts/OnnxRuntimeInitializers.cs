@@ -3,271 +3,128 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 
 /// <summary>
-/// Initializes the ONNX Runtime environment before any scene loads.
+/// Cross-Platform ONNX Runtime Initializer.
 /// 
-/// RESPONSIBILITIES:
-///   1. Detects if a CUDA GPU is available (via nvidia-smi or system libraries)
-///   2. Discovers system library paths (CUDA, cuDNN, VC++ Redistributables)
-///   3. Preloads native libraries in correct dependency order
-///   4. Sets up environment variables for DLL resolution
-/// 
-/// USAGE:
-///   This class uses [RuntimeInitializeOnLoadMethod] to run automatically
-///   before any scene loads. Other scripts can check:
-///   if (OnnxRuntimeInitializer.CudaDeviceAvailable) { ... }
+/// HOW TO USE:
+/// 1. Create an empty GameObject in your first scene (e.g., "ONNX_Manager").
+/// 2. Attach this script to it.
+/// 3. Fill in the paths for the OS you are currently building for.
+/// 4. The script will automatically preload the libraries in Awake().
 /// </summary>
 public class OnnxRuntimeInitializer : MonoBehaviour
 {
+    [Header("1. Windows Paths (Fill if building for Windows)")]
+    [Tooltip("Example: C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.9/bin")]
+    public string winCudaBinPath = @"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9\bin";
+
+    [Tooltip("Example: C:/Program Files/NVIDIA/CUDNN/v9.20/bin/12.9/x64")]
+    public string winCudnnBinPath = @"C:\Program Files\NVIDIA\CUDNN\v9.20\bin\12.9\x64";
+
+    [Header("2. Linux Paths (Fill if building for Linux)")]
+    [Tooltip("Example: /usr/local/cuda-12.9/lib64 or /usr/lib/x86_64-linux-gnu")]
+    public string linuxCudaPath = "/usr/local/cuda/lib64";
+
+    [Tooltip("Example: /usr/local/cuda/lib64 or path to libcudnn.so.9")]
+    public string linuxCudnnPath = "/usr/local/cuda/lib64";
+
+    [Header("3. ONNX Runtime Native Path (All OS)")]
+    [Tooltip("Relative to project root or absolute path to the native runtime folder.")]
+    public string onnxNativePath = @"Assets/Packages/Microsoft.ML.OnnxRuntime.Gpu.Windows.1.23.2/runtimes/win-x64/native";
+    // Note: For Linux builds, change the above to your Linux runtime path, e.g., "runtimes/linux-x64/native"
+
+    [Header("4. Options")]
+    [Tooltip("If true, attempts to manually preload libraries. If false, relies on OS default search.")]
+    public bool enablePreloading = true;
+
+    [Tooltip("If true, keeps this GameObject alive across scene loads.")]
+    public bool dontDestroyOnLoad = true;
+
     // =========================================================================
-    // CONFIGURATION
+    // STATIC STATE (Accessible by other scripts, e.g., demoMain.cs)
     // =========================================================================
-
-    /// <summary>Path to bundled ONNX Runtime package relative to project root.</summary>
-    private static readonly string OnnxRuntimePackagePath = @"Assets/Packages/Microsoft.ML.OnnxRuntime.Gpu.Windows.1.23.2";
-
-    /// <summary>Subpath to native DLLs within the package.</summary>
-    private static readonly string NativeDllPath = @"runtimes/win-x64/native";
-
-    /// <summary>
-    /// True if a CUDA-capable NVIDIA GPU was detected.
-    /// Checked by demoMain.cs to decide between CUDA and CPU execution providers.
-    /// </summary>
+    public static bool IsInitialized { get; private set; } = false;
     public static bool CudaDeviceAvailable { get; private set; } = false;
 
-    // =========================================================================
-    // AUTO-INITIALIZATION
-    // =========================================================================
-
-    /// <summary>
-    /// Runs automatically before any scene loads.
-    /// Detects GPU and preloads all required native libraries.
-    /// </summary>
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-    static void OnBeforeSceneLoad()
+    private void Awake()
     {
-        UnityEngine.Debug.Log("[ONNX] Initializing system environment...");
-        CudaDeviceAvailable = CheckCudaDeviceAvailable();
-        SetupEnvironmentAndPreloadLibs();
-        UnityEngine.Debug.Log($"[ONNX] Initialization complete. CUDA Device Available: {CudaDeviceAvailable}");
-    }
+        if (IsInitialized) return;
 
-    // =========================================================================
-    // GPU DETECTION
-    // =========================================================================
+        if (dontDestroyOnLoad)
+        {
+            DontDestroyOnLoad(gameObject);
+        }
 
-    /// <summary>
-    /// Checks if a CUDA-capable NVIDIA GPU is available.
-    /// 
-    /// STRATEGY:
-    ///   1. Try running nvidia-smi (most reliable)
-    ///   2. On Windows, check for nvcuda.dll in System32
-    ///   3. On Linux, check for libcuda.so.1 in standard paths
-    /// </summary>
-    private static bool CheckCudaDeviceAvailable()
-    {
-#if UNITY_STANDALONE_OSX
+        UnityEngine.Debug.Log("[ONNX] Initializing with user-provided paths...");
+
+#if UNITY_STANDALONE_WIN
+        CudaDeviceAvailable = !string.IsNullOrEmpty(winCudaBinPath) && 
+                              Directory.Exists(winCudaBinPath) && 
+                              File.Exists(Path.Combine(winCudaBinPath, "cudart64_12.dll"));
+#elif UNITY_STANDALONE_LINUX
+        CudaDeviceAvailable = !string.IsNullOrEmpty(linuxCudaPath) && 
+                              Directory.Exists(linuxCudaPath) && 
+                              File.Exists(Path.Combine(linuxCudaPath, "libcudart.so.12"));
+#elif UNITY_STANDALONE_OSX
         UnityEngine.Debug.LogWarning("[ONNX] macOS does not support NVIDIA CUDA. Falling back to CPU/CoreML.");
-        return false;
+        CudaDeviceAvailable = false;
 #endif
-        try
-        {
-            using var process = new Process();
-            process.StartInfo.FileName = "nvidia-smi";
-            process.StartInfo.Arguments = "-L";
-            process.StartInfo.RedirectStandardOutput = true;
-            process.StartInfo.RedirectStandardError = true;
-            process.StartInfo.UseShellExecute = false;
-            process.StartInfo.CreateNoWindow = true;
 
-            process.Start();
-            string output = process.StandardOutput.ReadToEnd();
-            bool exited = process.WaitForExit(3000);
-
-            if (exited && process.ExitCode == 0 && output.Contains("GPU") && output.Contains("UUID"))
-            {
-                UnityEngine.Debug.Log("[ONNX] NVIDIA GPU detected via nvidia-smi");
-                return true;
-            }
-            else
-            {
-                UnityEngine.Debug.LogWarning($"[ONNX] nvidia-smi exited with code {process.ExitCode} or returned empty output.");
-            }
-        }
-        catch (Exception ex)
+        if (enablePreloading)
         {
-            UnityEngine.Debug.LogWarning($"[ONNX] nvidia-smi check failed: {ex.Message}");
+            SetupEnvironmentAndPreloadLibs();
         }
 
-#if UNITY_STANDALONE_WIN
-        try
-        {
-            string systemDir = Environment.GetFolderPath(Environment.SpecialFolder.System);
-            if (File.Exists(Path.Combine(systemDir, "nvcuda.dll")))
-                UnityEngine.Debug.LogWarning("[ONNX] nvcuda.dll found but nvidia-smi failed. Assuming driver present but GPU unavailable.");
-            else
-                UnityEngine.Debug.LogWarning("[ONNX] nvcuda.dll not found in System32.");
-        }
-        catch (Exception ex) { UnityEngine.Debug.LogWarning($"[ONNX] Failed to check System32 for nvcuda.dll: {ex.Message}"); }
-#else
-        try
-        {
-            string[] stdPaths = { "/usr/lib/x86_64-linux-gnu", "/usr/lib64", "/usr/local/cuda/lib64" };
-            foreach (var p in stdPaths)
-                if (File.Exists(Path.Combine(p, "libcuda.so.1"))) { 
-                    UnityEngine.Debug.Log("[ONNX] NVIDIA driver (libcuda.so.1) detected."); 
-                    return true; 
-                }
-            UnityEngine.Debug.LogWarning("[ONNX] libcuda.so.1 not found in standard Linux paths.");
-        }
-        catch (Exception ex) { UnityEngine.Debug.LogWarning($"[ONNX] Failed to check for libcuda.so.1: {ex.Message}"); }
-#endif
-        return false;
+        IsInitialized = true;
+        UnityEngine.Debug.Log($"[ONNX] Initialization complete. CUDA Available: {CudaDeviceAvailable}");
+        UnityEngine.Debug.Log($"[ONNX] Current Platform: {Application.platform}");
     }
 
-    // =========================================================================
-    // ENVIRONMENT SETUP
-    // =========================================================================
-
-    /// <summary>
-    /// Sets up library search paths and preloads all required native libraries.
-    /// </summary>
-    private static void SetupEnvironmentAndPreloadLibs()
+    private void SetupEnvironmentAndPreloadLibs()
     {
-        // 1. Resolve bundled ONNX Runtime path
-        string projectRoot = Path.GetDirectoryName(Application.dataPath);
-        string onnxNativePath = Path.Combine(projectRoot, OnnxRuntimePackagePath, NativeDllPath);
+        var searchDirs = new List<string>();
 
-        if (!Directory.Exists(onnxNativePath))
-        {
-            var fallback = Directory.GetDirectories(Application.dataPath, "native", SearchOption.AllDirectories)
-                                      .FirstOrDefault(d => d.Contains("runtimes"));
-            onnxNativePath = fallback ?? null;
-        }
-
-        if (string.IsNullOrEmpty(onnxNativePath) || !Directory.Exists(onnxNativePath))
-            UnityEngine.Debug.LogError("[ONNX] ONNX Runtime native directory NOT FOUND. Preloading will fail.");
-
-        // 2. Discover system CUDA/cuDNN paths (Explicitly targeting 12.9 & 9.20)
-        var systemLibPaths = DiscoverSystemLibPaths();
-        UnityEngine.Debug.Log($"[ONNX] Using {systemLibPaths.Count()} system directories for DLL resolution: {string.Join(", ", systemLibPaths)}");
-
-        // 3. Update process library search paths
-        UpdateLibrarySearchPaths(systemLibPaths);
-
-        // 4. Preload libraries in exact dependency order
-        PreloadAllSystemLibs(onnxNativePath, systemLibPaths);
-    }
-
-    /// <summary>
-    /// Preloads all system libraries in the correct dependency order.
-    /// Order matters: VC++ -> CUDA -> cuDNN -> ONNX Runtime
-    /// </summary>
-    private static void PreloadAllSystemLibs(string onnxPath, IEnumerable<string> searchDirs)
-    {
-        bool success = true;
-
-        // 1. Visual C++ Redistributables (Windows only)
 #if UNITY_STANDALONE_WIN
-        foreach (var dll in GetVcRedistLibs())
-            if (!PreloadLib(dll, searchDirs, false)) success = false;
+        if (!string.IsNullOrEmpty(winCudaBinPath) && Directory.Exists(winCudaBinPath))
+            searchDirs.Add(winCudaBinPath);
+        if (!string.IsNullOrEmpty(winCudnnBinPath) && Directory.Exists(winCudnnBinPath))
+            searchDirs.Add(winCudnnBinPath);
+        searchDirs.Add(Environment.GetFolderPath(Environment.SpecialFolder.System));
+
+#elif UNITY_STANDALONE_LINUX
+        if (!string.IsNullOrEmpty(linuxCudaPath) && Directory.Exists(linuxCudaPath))
+            searchDirs.Add(linuxCudaPath);
+        if (!string.IsNullOrEmpty(linuxCudnnPath) && Directory.Exists(linuxCudnnPath))
+            searchDirs.Add(linuxCudnnPath);
+        searchDirs.Add("/usr/lib/x86_64-linux-gnu");
+        searchDirs.Add("/usr/lib64");
 #endif
 
-        // 2. CUDA Runtime & Compute Libraries
-        foreach (var lib in GetCudaLibs())
-            if (!PreloadLib(lib, searchDirs, false)) success = false;
-
-        // 3. cuDNN Libraries
-        foreach (var lib in GetCudnnLibs())
-            if (!PreloadLib(lib, searchDirs, false)) success = false;
-
-        // 4. ONNX Runtime Core & Shared Providers
-        if (!string.IsNullOrEmpty(onnxPath) && Directory.Exists(onnxPath))
+        // Resolve ONNX Runtime path (convert relative to absolute if needed)
+        string resolvedOnnxPath = onnxNativePath;
+        if (!string.IsNullOrEmpty(resolvedOnnxPath) && !Path.IsPathRooted(resolvedOnnxPath))
         {
-            foreach (var lib in GetOnnxRuntimeLibs())
-            {
-                string fullPath = Path.Combine(onnxPath, lib);
-                if (!PreloadLib(fullPath, searchDirs, true)) success = false;
-            }
+            string projectRoot = Application.dataPath.Replace("/Assets", "").Replace("\\Assets", "");
+            resolvedOnnxPath = Path.Combine(projectRoot, resolvedOnnxPath);
+        }
+
+        if (!string.IsNullOrEmpty(resolvedOnnxPath) && Directory.Exists(resolvedOnnxPath))
+        {
+            searchDirs.Add(resolvedOnnxPath);
         }
         else
         {
-            UnityEngine.Debug.LogError("[ONNX] Cannot preload ONNX DLLs: Native directory missing.");
-            success = false;
+            UnityEngine.Debug.LogWarning($"[ONNX] ONNX Runtime native path not found: {resolvedOnnxPath}");
         }
 
-        UnityEngine.Debug.Log($"[ONNX] Library preloading {(success ? "COMPLETED" : "COMPLETED WITH ERRORS. Check logs above.")}");
+        UpdateLibrarySearchPaths(searchDirs);
+        PreloadLibs(resolvedOnnxPath, searchDirs);
     }
 
-    // =========================================================================
-    // PATH DISCOVERY
-    // =========================================================================
-
-    /// <summary>
-    /// Discovers system library directories for CUDA, cuDNN, and VC++ redistributables.
-    /// </summary>
-    private static IEnumerable<string> DiscoverSystemLibPaths()
-    {
-        var dirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-#if UNITY_STANDALONE_WIN
-        string programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
-
-        // Explicitly target CUDA 12.9
-        string cudaPath = Path.Combine(programFiles, "NVIDIA GPU Computing Toolkit", "CUDA", "v12.9", "bin");
-        if (Directory.Exists(cudaPath)) dirs.Add(cudaPath);
-        else UnityEngine.Debug.LogWarning("[ONNX] Expected CUDA 12.9 path not found: " + cudaPath);
-
-        // Explicitly target cuDNN 9.20 with correct NVIDIA 9.x nested structure: v9.20\bin\12.9\x64
-        string cudnnBase = Path.Combine(programFiles, "NVIDIA", "CUDNN", "v9.20", "bin");
-        string[] cudnnCandidates = new[] {
-            Path.Combine(cudnnBase, "12.9", "x64"), // Primary expected path for CUDA 12.9
-            Path.Combine(cudnnBase, "12.9"),         // Fallback if x64 isn't separate
-            Path.Combine(cudnnBase, "x64"),          // Legacy fallback
-            cudnnBase                                // Final fallback
-        };
-
-        bool foundCudnn = false;
-        foreach (var candidate in cudnnCandidates)
-        {
-            if (Directory.Exists(candidate))
-            {
-                dirs.Add(candidate);
-                if (!foundCudnn)
-                {
-                    UnityEngine.Debug.Log($"[ONNX] ✓ Found cuDNN 9.20 at: {candidate}");
-                    foundCudnn = true;
-                }
-            }
-        }
-
-        if (!foundCudnn)
-        {
-            UnityEngine.Debug.LogWarning("[ONNX] Expected cuDNN 9.20 paths not found. Checked: " + string.Join(", ", cudnnCandidates));
-        }
-
-        // System fallbacks for VC++ & driver
-        dirs.Add(Environment.GetFolderPath(Environment.SpecialFolder.System));
-        dirs.Add(Environment.GetFolderPath(Environment.SpecialFolder.SystemX86));
-
-#elif UNITY_STANDALONE_LINUX
-        dirs.Add("/usr/local/cuda-12.9/lib64");
-        dirs.Add("/usr/local/cuda/lib64");
-        dirs.Add("/usr/lib/x86_64-linux-gnu");
-#endif
-        return dirs;
-    }
-
-    /// <summary>
-    /// Updates the process environment variables to include discovered library paths.
-    /// </summary>
     private static void UpdateLibrarySearchPaths(IEnumerable<string> dirs)
     {
-        if (!dirs.Any()) return;
-
+        if (dirs == null) return;
         string combined = string.Join(Path.PathSeparator, dirs);
         string currentPath;
 
@@ -286,28 +143,76 @@ public class OnnxRuntimeInitializer : MonoBehaviour
 #endif
     }
 
-    // =========================================================================
-    // LIBRARY PRELOADING
-    // =========================================================================
+    private static void PreloadLibs(string onnxPath, IEnumerable<string> searchDirs)
+    {
+        UnityEngine.Debug.Log("[ONNX] Preloading libraries for current platform...");
 
-    /// <summary>
-    /// Preloads a single native library from search directories or absolute path.
-    /// </summary>
-    /// <param name="libName">Library name or absolute path.</param>
-    /// <param name="searchDirs">Directories to search.</param>
-    /// <param name="critical">If true, failure is logged as error; otherwise warning.</param>
+#if UNITY_STANDALONE_WIN
+        // 1. Visual C++ Redistributables
+        PreloadLib("msvcp140.dll", searchDirs, false);
+        PreloadLib("vcruntime140.dll", searchDirs, false);
+        PreloadLib("vcruntime140_1.dll", searchDirs, false);
+
+        // 2. Core CUDA Libraries
+        PreloadLib("cudart64_12.dll", searchDirs, false);
+        PreloadLib("cublas64_12.dll", searchDirs, false);
+        PreloadLib("cublasLt64_12.dll", searchDirs, false);
+        PreloadLib("cufft64_11.dll", searchDirs, false);
+        PreloadLib("curand64_10.dll", searchDirs, false);
+        PreloadLib("cusparse64_12.dll", searchDirs, false);
+        PreloadLib("cusolver64_11.dll", searchDirs, false);
+
+        // 3. cuDNN 9.x Libraries
+        PreloadLib("cudnn64_9.dll", searchDirs, false);
+        PreloadLib("cudnn_ops64_9.dll", searchDirs, false);
+        PreloadLib("cudnn_adv64_9.dll", searchDirs, false);
+
+        // 4. ONNX Runtime Core
+        if (!string.IsNullOrEmpty(onnxPath) && Directory.Exists(onnxPath))
+        {
+            PreloadLib(Path.Combine(onnxPath, "onnxruntime.dll"), searchDirs, true);
+            PreloadLib(Path.Combine(onnxPath, "onnxruntime_providers_shared.dll"), searchDirs, false);
+        }
+
+#elif UNITY_STANDALONE_LINUX
+        // 1. Core CUDA Libraries (.so)
+        PreloadLib("libcudart.so.12", searchDirs, false);
+        PreloadLib("libcublas.so.12", searchDirs, false);
+        PreloadLib("libcublasLt.so.12", searchDirs, false);
+        PreloadLib("libcufft.so.11", searchDirs, false);
+        PreloadLib("libcurand.so.10", searchDirs, false);
+        PreloadLib("libcusparse.so.12", searchDirs, false);
+        PreloadLib("libcusolver.so.11", searchDirs, false);
+
+        // 2. cuDNN 9.x Libraries (.so)
+        PreloadLib("libcudnn.so.9", searchDirs, false);
+        PreloadLib("libcudnn_ops.so.9", searchDirs, false);
+        PreloadLib("libcudnn_adv.so.9", searchDirs, false);
+
+        // 3. ONNX Runtime Core (.so)
+        if (!string.IsNullOrEmpty(onnxPath) && Directory.Exists(onnxPath))
+        {
+            PreloadLib(Path.Combine(onnxPath, "libonnxruntime.so"), searchDirs, true);
+            PreloadLib(Path.Combine(onnxPath, "libonnxruntime_providers_shared.so"), searchDirs, false);
+        }
+
+#elif UNITY_STANDALONE_OSX
+        // macOS: No CUDA support. ONNX Runtime will use CPU or CoreML Execution Provider.
+        UnityEngine.Debug.Log("[ONNX] macOS detected. Skipping CUDA/cuDNN preloading. Using CPU/CoreML.");
+        if (!string.IsNullOrEmpty(onnxPath) && Directory.Exists(onnxPath))
+        {
+            PreloadLib(Path.Combine(onnxPath, "libonnxruntime.dylib"), searchDirs, true);
+        }
+#endif
+    }
+
     private static bool PreloadLib(string libName, IEnumerable<string> searchDirs, bool critical)
     {
-        string targetPath = null;
+        string targetPath = libName;
 
-        // 1. Try exact absolute path first
-        if (Path.IsPathRooted(libName) && File.Exists(libName))
+        // If it's not an absolute path, search the provided directories
+        if (!Path.IsPathRooted(libName))
         {
-            targetPath = libName;
-        }
-        else
-        {
-            // 2. Search discovered system directories for the exact file
             foreach (var dir in searchDirs)
             {
                 string candidate = Path.Combine(dir, libName);
@@ -319,111 +224,29 @@ public class OnnxRuntimeInitializer : MonoBehaviour
             }
         }
 
-        // 3. If not found in search dirs, fallback to bare name (OS default search)
-        if (targetPath == null)
-        {
-            if (!critical) UnityEngine.Debug.LogWarning($"[ONNX] '{libName}' not found in discovered paths. Falling back to OS default search...");
-            return LoadNative(libName, critical);
-        }
-
-        // 4. Load using resolved full path
-        return LoadNative(targetPath, critical);
-    }
-
-    /// <summary>
-    /// Platform-specific native library loading.
-    /// </summary>
-    private static bool LoadNative(string pathOrName, bool critical)
-    {
 #if UNITY_STANDALONE_WIN
-        IntPtr handle = LoadLibraryW(pathOrName);
+        IntPtr handle = LoadLibraryW(targetPath);
         if (handle == IntPtr.Zero)
         {
             int err = Marshal.GetLastWin32Error();
-            string fileName = Path.GetFileName(pathOrName);
-            bool fileExists = Path.IsPathRooted(pathOrName) && File.Exists(pathOrName);
-
-            string msg;
-            if (err == 126 && fileExists)
-                msg = $"[ONNX] ERROR 126 loading {fileName}: File exists at '{pathOrName}', but one of its DEPENDENCIES is missing or incompatible.";
-            else if (err == 126)
-                msg = $"[ONNX] ERROR 126 loading {fileName}: DLL or dependency not found in any search path.";
-            else
-                msg = $"[ONNX] Failed to load {fileName} (Win32 Error {err}). Path: {pathOrName}";
-
-            if (critical) UnityEngine.Debug.LogError(msg); else UnityEngine.Debug.LogWarning(msg);
+            string msg = $"[ONNX] Failed to load {Path.GetFileName(libName)} (Win32 Error {err}). Path: {targetPath}";
+            if (critical) UnityEngine.Debug.LogError(msg); 
+            else UnityEngine.Debug.LogWarning(msg);
             return false;
         }
 #elif UNITY_STANDALONE_LINUX || UNITY_STANDALONE_OSX
-        IntPtr handle = dlopen(pathOrName, 0x5); // RTLD_LAZY | RTLD_GLOBAL
+        IntPtr handle = dlopen(targetPath, 0x5); // RTLD_LAZY | RTLD_GLOBAL
         if (handle == IntPtr.Zero)
         {
             string err = Marshal.PtrToStringAnsi(dlerror()) ?? "Unknown";
-            string msg = $"[ONNX] Failed to load {Path.GetFileName(pathOrName)} (dlerror: {err}). Path: {pathOrName}";
-            if (critical) UnityEngine.Debug.LogError(msg); else UnityEngine.Debug.LogWarning(msg);
+            string msg = $"[ONNX] Failed to load {Path.GetFileName(libName)} (dlerror: {err}). Path: {targetPath}";
+            if (critical) UnityEngine.Debug.LogError(msg); 
+            else UnityEngine.Debug.LogWarning(msg);
             return false;
         }
-#else
-        string msg = $"[ONNX] Native loading not implemented for this platform. Skipping: {Path.GetFileName(pathOrName)}";
-        if (critical) UnityEngine.Debug.LogError(msg); else UnityEngine.Debug.LogWarning(msg);
-        return false;
 #endif
-        UnityEngine.Debug.Log($"[ONNX] ✓ Preloaded: {Path.GetFileName(pathOrName)}");
+        UnityEngine.Debug.Log($"[ONNX] ✓ Preloaded: {Path.GetFileName(targetPath)}");
         return true;
-    }
-
-    // =========================================================================
-    // PLATFORM-SPECIFIC LIBRARY NAMES
-    // =========================================================================
-
-    private static IEnumerable<string> GetVcRedistLibs()
-    {
-#if UNITY_STANDALONE_WIN
-        return new[] { "msvcp140.dll", "vcruntime140.dll", "vcruntime140_1.dll" };
-#else
-        return Enumerable.Empty<string>();
-#endif
-    }
-
-    private static IEnumerable<string> GetCudaLibs()
-    {
-#if UNITY_STANDALONE_WIN
-        return new[] { "cudart64_12.dll", "nvJitLink_120_0.dll", "nvrtc-builtins64_129.dll", "nvrtc64_120_0.dll",
-                       "cublas64_12.dll", "cublasLt64_12.dll", "cufft64_11.dll", "curand64_10.dll",
-                       "cusparse64_12.dll", "cusolver64_11.dll", "nppc64_12.dll", "npps64_12.dll" };
-#elif UNITY_STANDALONE_LINUX
-        return new[] { "libcudart.so.12", "libnvJitLink.so.12", "libnvrtc-builtins.so.12", "libnvrtc.so.12",
-                       "libcublas.so.12", "libcublasLt.so.12", "libcufft.so.11", "libcurand.so.10",
-                       "libcusparse.so.12", "libcusolver.so.11", "libnppc.so.12", "libnpps.so.12" };
-#else
-        return Enumerable.Empty<string>();
-#endif
-    }
-
-    private static IEnumerable<string> GetCudnnLibs()
-    {
-#if UNITY_STANDALONE_WIN
-        return new[] { "cudnn64_9.dll", "cudnn_ops64_9.dll", "cudnn_adv64_9.dll", "cudnn_heuristic64_9.dll",
-                       "cudnn_engines_runtime_compiled64_9.dll", "cudnn_engines_precompiled64_9.dll", "cudnn_graph64_9.dll" };
-#elif UNITY_STANDALONE_LINUX
-        return new[] { "libcudnn.so.9", "libcudnn_ops.so.9", "libcudnn_adv.so.9", "libcudnn_heuristic.so.9",
-                       "libcudnn_engines_runtime_compiled.so.9", "libcudnn_engines_precompiled.so.9", "libcudnn_graph.so.9" };
-#else
-        return Enumerable.Empty<string>();
-#endif
-    }
-
-    private static IEnumerable<string> GetOnnxRuntimeLibs()
-    {
-#if UNITY_STANDALONE_WIN
-        return new[] { "onnxruntime.dll", "onnxruntime_providers_shared.dll" };
-#elif UNITY_STANDALONE_LINUX
-        return new[] { "libonnxruntime.so", "libonnxruntime_providers_shared.so" };
-#elif UNITY_STANDALONE_OSX
-        return new[] { "libonnxruntime.dylib", "libonnxruntime_providers_shared.dylib" };
-#else
-        return new[] { "onnxruntime", "onnxruntime_providers_shared" };
-#endif
     }
 
     // =========================================================================
@@ -435,6 +258,7 @@ public class OnnxRuntimeInitializer : MonoBehaviour
 #elif UNITY_STANDALONE_LINUX || UNITY_STANDALONE_OSX
     [DllImport("libdl.so.2", SetLastError = true)]
     static extern IntPtr dlopen(string filename, int flags);
+    
     [DllImport("libdl.so.2", SetLastError = true)]
     static extern IntPtr dlerror();
 #endif

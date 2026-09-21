@@ -479,7 +479,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::demoMain
   avatarController: {fileID: 1212917552}
-  cameraIndex: 0
+  selectedCameraName: OBS Virtual Camera
   displayImage: {fileID: 1517309865}
   enableHeadPoseEstimation: 1
   enableActiveSpeakerDetection: 1
@@ -529,6 +529,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 020cbc7796f67784b9c0863334585d6b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OnnxRuntimeInitializer
+  winCudaBinPath: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9\bin
+  winCudnnBinPath: C:\Program Files\NVIDIA\CUDNN\v9.20\bin
+  linuxCudaPath: /usr/local/cuda/lib64
+  linuxCudnnPath: /usr/local/cuda/lib64
+  onnxNativePath: Assets/Packages/Microsoft.ML.OnnxRuntime.Gpu.Windows.1.23.2/runtimes/win-x64/native
+  enablePreloading: 1
+  dontDestroyOnLoad: 1
 --- !u!4 &820434127
 Transform:
   m_ObjectHideFlags: 0
@@ -700,6 +707,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cd74e3a17d965cc499dd21fae5c0b710, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AudioCapture
+  selectedMicrophoneName: Lavalier (High Definition Audio Device)
   micGain: 1500
   targetSampleRate: 16000
   audioClipLength: 10
