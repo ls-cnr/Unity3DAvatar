@@ -479,11 +479,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::demoMain
   avatarController: {fileID: 1212917552}
-  selectedCameraName: OBS Virtual Camera
+  selectedCameraName: USB Camera
   displayImage: {fileID: 1517309865}
   enableHeadPoseEstimation: 1
   enableActiveSpeakerDetection: 1
   audioCapture: {fileID: 1624415320}
+  useNewPolicySystem: 1
+  legacyEngagementModule: {fileID: 1984105760}
+  newEngagementManager: {fileID: 2129729988}
 --- !u!4 &622190488
 Transform:
   m_ObjectHideFlags: 0
@@ -737,7 +740,7 @@ GameObject:
   - component: {fileID: 1984105759}
   - component: {fileID: 1984105760}
   m_Layer: 0
-  m_Name: EngagementBehaviorTree
+  m_Name: LegacyEngagement
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -774,6 +777,52 @@ MonoBehaviour:
   MaxPitchThreshold: 30
   SpeakingScoreThreshold: 0.5
   DisengagementTimeout: 3
+--- !u!1 &2129729987
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2129729989}
+  - component: {fileID: 2129729988}
+  m_Layer: 0
+  m_Name: Engagement
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2129729988
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2129729987}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 61e28532c9b33fa439c7611730666d63, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EngagementManager
+  policyAsset: {fileID: 11400000, guid: c122fb2ff37f7b141a6ca33eadfa1223, type: 2}
+  avatarController: {fileID: 1212917552}
+--- !u!4 &2129729989
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2129729987}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 7.24753, y: -1.50495, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &2143735329
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -897,4 +946,5 @@ SceneRoots:
   - {fileID: 622190488}
   - {fileID: 1624415321}
   - {fileID: 1984105759}
+  - {fileID: 2129729989}
   - {fileID: 2143735329}

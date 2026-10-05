@@ -1,6 +1,16 @@
-# UnityAvatar3D: Multi Modal Engagement
+# Unity3DAvatar: Multi Modal Engagement
 ## Overview
-The project's goal is to build a system that allows the 3D Avatar to look at a specific user that is targeted as the "engaged" user. The targeting logic is managed through a Behavior Tree (BT). The project is built in `Unity 6.3 LTS (6000.3.9f1)` and the models are prepared in `Python 3.13.9`.
+
+The project's goal is to build a system that allows a 3D Avatar to look at a specific user that is targeted as the "engaged" user. The targeting logic is managed through a Behavior Tree (BT). The following software is needed to replicate the project on your machine:
+
+- Unity: `6.3 LTS (6000.3.9f1)`
+- Python: `3.13.9`
+- CUDA: `12.9`
+- CUDNN: `9.20`
+- NuGetForUnity: `4.5.0`
+
+The following instructions will guide you in setting everything up accordingly.
+In systems running MacOS the project will fallback to using the CPU to run the neural networks.
 
 ## Instructions
 ### ML Models
@@ -74,3 +84,10 @@ With all these packages installed, all the errors should be resolved. If needed,
 Now, to finish the setup, use the `Project` sub-interface inside the Unity Editor to navigate to the `Assets/Scenes` folder and double click on the `newScene` file to load the scene. After loading, you will be able to Play the demo. We recommend using scene view and putting side by side the Canvas in the 3D environment with the AvatarCamera through the cameras tool for the best experience.
 
 All the modifiable values for the MonoBehaviour scripts are easily understood through the use of the Unity Inspector on the objects they're attached to. Also, the scripts are extensively commented to make them easy to understand.
+
+## References
+
+In building this project we've referenced the following ones:
+- [python_speech_features](https://github.com/jameslyons/python_speech_features), for the utilities needed to use the ASD model;
+
+*clicking on a project's name will take you to the project's own site/repository*

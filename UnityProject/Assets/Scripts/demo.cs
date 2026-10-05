@@ -8,6 +8,8 @@ using System.Diagnostics;
 using System.Linq;
 using System;
 using System.Buffers;
+using System.Runtime.InteropServices;
+using LegacyEngagement;
 
 /// <summary>
 /// Main application controller that orchestrates all ML pipelines:
@@ -15,11 +17,11 @@ using System.Buffers;
 ///   2. Face Tracking (SORT or IOU)
 ///   3. Head Pose Estimation (6DRepNet)
 ///   4. Active Speaker Detection (LRASD)
-///   5. Engagement Logic
+///   5. Engagement Logic (Legacy OR New Policy System)
 ///   6. Avatar Control
-/// 
+///
 /// PIPELINE PER FRAME:
-///   Capture -> Detect -> Track -> Estimate Pose -> Detect Speaker -> 
+///   Capture -> Detect -> Track -> Estimate Pose -> Detect Speaker ->
 ///   Update Engagement -> Control Avatar -> Render
 /// </summary>
 public class demoMain : MonoBehaviour
@@ -27,47 +29,55 @@ public class demoMain : MonoBehaviour
     // =========================================================================
     // INSPECTOR REFERENCES
     // =========================================================================
-
     [Header("Avatar Controller")]
     [Tooltip("Avatar that will look at the engaged user.")]
     public AvatarHeadController avatarController;
-
+    
     [Header("Camera Settings")]
     [Tooltip("Select the webcam to use")]
     [WebcamDeviceSelector]
     public string selectedCameraName;
-
     [Tooltip("UI RawImage to display the camera feed.")]
     public RawImage displayImage;
-
+    
     [Header("Toggles")]
     [Tooltip("Enable head pose estimation (6DRepNet).")]
     public bool enableHeadPoseEstimation = true;
-
     [Tooltip("Enable active speaker detection (LRASD).")]
     public bool enableActiveSpeakerDetection = true;
-
+    
     [Header("AudioCapture Component")]
     [Tooltip("Reference to AudioCapture component (auto-detected if null).")]
     public AudioCapture audioCapture;
 
     // =========================================================================
+    // ENGAGEMENT SYSTEM TOGGLE & REFERENCES
+    // =========================================================================
+    [Header("Engagement System Toggle")]
+    [Tooltip("Enable to use the new Policy-driven Formula and Behavior Tree. Disable to use the original hardcoded EngagementModule.")]
+    public bool useNewPolicySystem = false;
+
+    [Header("Legacy Engagement System")]
+    [Tooltip("The original EngagementModule (keep for reference/testing).")]
+    public EngagementModule legacyEngagementModule;
+
+    [Header("New Policy Engagement System")]
+    [Tooltip("The new EngagementManager (Formula + Behavior Tree).")]
+    public EngagementManager newEngagementManager;
+
+    // =========================================================================
     // VIDEO CAPTURE
     // =========================================================================
-
     /// <summary>OpenCV video capture from webcam.</summary>
     private VideoCapture capture;
-
     /// <summary>Unity texture for displaying the camera feed.</summary>
     private Texture2D cameraTexture;
-
     /// <summary>True when the processing loop is running.</summary>
     private bool isRunning = false;
 
     // =========================================================================
     // REUSABLE MATS (avoid per-frame allocation)
     // =========================================================================
-
     private Mat reusableCaptureFrame = new Mat();
     private Mat reusableResizedCapture = new Mat();
     private Mat reusableScaledMat = new Mat();
@@ -75,7 +85,6 @@ public class demoMain : MonoBehaviour
     // =========================================================================
     // DISPLAY PARAMETERS
     // =========================================================================
-
     private float textScale;
     private int boxThickness;
     private int textThickness;
@@ -88,7 +97,6 @@ public class demoMain : MonoBehaviour
     // =========================================================================
     // MODEL SCALING (camera -> model input coordinates)
     // =========================================================================
-
     private float displayScaleX;
     private float displayScaleY;
     private float modelScaleX;
@@ -101,7 +109,6 @@ public class demoMain : MonoBehaviour
     // =========================================================================
     // PERFORMANCE TRACKING
     // =========================================================================
-
     private Stopwatch frameTimer = new Stopwatch();
     private float[] frameTimeHistory = new float[60];
     private int frameTimeIndex = 0;
@@ -110,30 +117,18 @@ public class demoMain : MonoBehaviour
     // =========================================================================
     // ML MODULE REFERENCES
     // =========================================================================
-
     /// <summary>Face detection (UltraFace ONNX).</summary>
     private FaceDetection faceDetector;
-
     /// <summary>Face tracking (SORT or IOU).</summary>
     private Faces faces;
-
     /// <summary>Head pose estimation (6DRepNet ONNX).</summary>
     private HeadPoseEstimation headPoseEstimator;
-
     /// <summary>Active speaker detection (LRASD ONNX).</summary>
     private ActiveSpeakerDetection activeSpeakerDetector;
 
     // =========================================================================
-    // ENGAGEMENT MODULE
-    // =========================================================================
-
-    /// <summary>User engagement state manager.</summary>
-    private EngagementModule engagementModule;
-
-    // =========================================================================
     // UNITY LIFECYCLE: START
     // =========================================================================
-
     /// <summary>
     /// Initializes camera, ML models, and engagement system.
     /// </summary>
@@ -141,12 +136,10 @@ public class demoMain : MonoBehaviour
     {
         // --- NEW: Resolve the selected camera NAME to an OpenCV INDEX ---
         int openCvCameraIndex = 0; // Default fallback
-
         if (!string.IsNullOrEmpty(selectedCameraName))
         {
             WebCamDevice[] devices = WebCamTexture.devices;
             bool found = false;
-
             for (int i = 0; i < devices.Length; i++)
             {
                 if (devices[i].name == selectedCameraName)
@@ -156,7 +149,6 @@ public class demoMain : MonoBehaviour
                     break;
                 }
             }
-
             if (!found)
             {
                 UnityEngine.Debug.LogWarning($"[Camera] Selected camera '{selectedCameraName}' not found in system. Falling back to index 0.");
@@ -166,44 +158,52 @@ public class demoMain : MonoBehaviour
         {
             UnityEngine.Debug.LogWarning("[Camera] No camera name selected in Inspector. Falling back to index 0.");
         }
-
         UnityEngine.Debug.Log($"[Camera] Attempting to open OpenCV VideoCapture at index: {openCvCameraIndex}");
 
         // Initialize OpenCV camera with the resolved index
         capture = new VideoCapture(openCvCameraIndex);
-        
         if (!capture.IsOpened())
         {
-            UnityEngine.Debug.LogError($"[Camera] Camera initialization failed at index {openCvCameraIndex}. Check if another app is using it, or select a different camera in the Inspector.");
+            UnityEngine.Debug.LogError($"[Camera] Camera initialization failed at index {openCvCameraIndex}.");
             return;
         }
 
-        // Calculate scaling from camera resolution to model input (640x480)
-        // Uses uniform scaling with letterboxing (black bars)
-        float scaleX = modelInputWidth / (float)capture.FrameWidth;
-        float scaleY = modelInputHeight / (float)capture.FrameHeight;
-        float uniformScale = Math.Min(scaleX, scaleY);
+        capture.Grab();
+        capture.Retrieve(reusableCaptureFrame);
 
+        if (reusableCaptureFrame.Empty())
+        {
+            UnityEngine.Debug.LogError("[Camera] Could not grab initial frame.");
+            return;
+        }
+
+        // Use the ACTUAL frame dimensions, not the potentially faulty capture properties
+        int trueWidth = reusableCaptureFrame.Width;
+        int trueHeight = reusableCaptureFrame.Height;
+        UnityEngine.Debug.Log($"[Camera] True Stream Resolution: {trueWidth}x{trueHeight}");
+
+        // Calculate scaling from camera resolution to model input (640x480)
+        float scaleX = modelInputWidth / (float)trueWidth;
+        float scaleY = modelInputHeight / (float)trueHeight;
+        float uniformScale = Math.Min(scaleX, scaleY);
+        
         modelScaleX = uniformScale;
         modelScaleY = uniformScale;
-
-        int scaledWidth = (int)(capture.FrameWidth * uniformScale);
-        int scaledHeight = (int)(capture.FrameHeight * uniformScale);
+        
+        int scaledWidth = (int)(trueWidth * uniformScale);
+        int scaledHeight = (int)(trueHeight * uniformScale);
         padX = (modelInputWidth - scaledWidth) / 2;
         padY = (modelInputHeight - scaledHeight) / 2;
-
-        UnityEngine.Debug.Log($"Camera: {capture.FrameWidth}x{capture.FrameHeight},  " +
-                            $"Model scale: {modelScaleX:F3},  " +
-                            $"Scaled: {scaledWidth}x{scaledHeight},  " +
-                            $"Pad: {padX},{padY}");
+        
+        UnityEngine.Debug.Log($"Model scale: {modelScaleX:F3}, Scaled: {scaledWidth}x{scaledHeight}, Pad: {padX},{padY}");
 
         // Calculate display scaling based on 1080p reference
-        resolutionScale = Mathf.Max(capture.FrameWidth, capture.FrameHeight) / 1080f;
+        resolutionScale = Mathf.Max(trueWidth, trueHeight) / 1080f;
         textScale = Mathf.Max(0.5f, 0.6f * resolutionScale);
         boxThickness = Mathf.Max(1, (int)(2 * resolutionScale));
         textThickness = Mathf.Max(1, (int)(2 * resolutionScale));
         statsHeight = (int)(25 * resolutionScale);
-        statsWidth = (int)(280 * resolutionScale); 
+        statsWidth = (int)(280 * resolutionScale);
         fontHeight = (int)(20 * resolutionScale);
 
         // Setup display texture
@@ -236,7 +236,7 @@ public class demoMain : MonoBehaviour
             {
                 UnityEngine.Debug.LogWarning(
                     $"CUDA provider failed to initialize: {ex.Message}.  " +
-                     "Falling back to CPU...");
+                    "Falling back to CPU...");
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
             }
@@ -248,15 +248,15 @@ public class demoMain : MonoBehaviour
         }
 
         // Initialize face detection and tracking
-        faceDetector = new FaceDetection(options, modelScaleX, modelScaleY, padX, padY, 
-                                          modelsPath, capture.FrameWidth, capture.FrameHeight, boxThickness);
+        faceDetector = new FaceDetection(options, modelScaleX, modelScaleY, padX, padY,
+            modelsPath, capture.FrameWidth, capture.FrameHeight, boxThickness);
         faces = new Faces(modelScaleX, modelScaleY, padX, padY, capture.FrameWidth, capture.FrameHeight, useSort: true);
 
         // Initialize optional modules
         if (enableHeadPoseEstimation)
         {
-            headPoseEstimator = new HeadPoseEstimation(options, modelsPath, modelScaleX, modelScaleY, 
-                                                        padX, padY, textScale, textThickness, resolutionScale);
+            headPoseEstimator = new HeadPoseEstimation(options, modelsPath, modelScaleX, modelScaleY,
+                padX, padY, textScale, textThickness, resolutionScale);
         }
         else
         {
@@ -281,23 +281,27 @@ public class demoMain : MonoBehaviour
             UnityEngine.Debug.Log("Active Speaker Detection: Not Activated");
         }
 
-        // Initialize Engagement Module
-        engagementModule = FindFirstObjectByType<EngagementModule>();
-        if (engagementModule == null)
+        // --- ENGAGEMENT SYSTEM INITIALIZATION ---
+        // Auto-find modules if not assigned in Inspector
+        if (legacyEngagementModule == null)
         {
-            GameObject moduleObj = new GameObject("EngagementModule");
-            engagementModule = moduleObj.AddComponent<EngagementModule>();
-            UnityEngine.Debug.Log("[Demo] Created EngagementModule");
+            legacyEngagementModule = FindFirstObjectByType<EngagementModule>();
+        }
+        if (newEngagementManager == null)
+        {
+            newEngagementManager = FindFirstObjectByType<EngagementManager>();
         }
 
-        // Subscribe to engagement events for robot actions
-        engagementModule.OnUserEngaged += (id) => { 
-            UnityEngine.Debug.Log($"[Robot] Turning attention to User {id}"); 
-        };
-
-        engagementModule.OnUserDisengaged += () => { 
-            UnityEngine.Debug.Log("[Robot] No user engaged. Idle behavior."); 
-        };
+        // Subscribe to legacy engagement events for robot actions (optional debug)
+        if (legacyEngagementModule != null)
+        {
+            legacyEngagementModule.OnUserEngaged += (id) => {
+                UnityEngine.Debug.Log($"[Robot Legacy] Turning attention to User {id}");
+            };
+            legacyEngagementModule.OnUserDisengaged += () => {
+                UnityEngine.Debug.Log("[Robot Legacy] No user engaged. Idle behavior.");
+            };
+        }
 
         isRunning = true;
         frameTimer.Start();
@@ -306,7 +310,6 @@ public class demoMain : MonoBehaviour
     // =========================================================================
     // UNITY LIFECYCLE: UPDATE (MAIN LOOP)
     // =========================================================================
-
     /// <summary>
     /// Main processing loop executed every frame.
     /// </summary>
@@ -323,7 +326,6 @@ public class demoMain : MonoBehaviour
         // --- STEP 1: Capture frame from camera ---
         capture.Grab();
         capture.Retrieve(reusableCaptureFrame);
-
         if (reusableCaptureFrame.Empty())
         {
             UnityEngine.Debug.Log("Was not able to get a frame from camera.");
@@ -333,8 +335,8 @@ public class demoMain : MonoBehaviour
         // --- STEP 2: Resize and pad for model input ---
         Cv2.Resize(reusableCaptureFrame, reusableScaledMat, new Size(), modelScaleX, modelScaleY);
         Cv2.CopyMakeBorder(reusableScaledMat, reusableResizedCapture,
-                        padY, padY, padX, padX,
-                        BorderTypes.Constant, new Scalar(0, 0, 0));
+            padY, padY, padX, padX,
+            BorderTypes.Constant, new Scalar(0, 0, 0));
 
         // --- STEP 3: Detect faces ---
         var detections = faceDetector.Inference(reusableCaptureFrame, reusableResizedCapture);
@@ -347,8 +349,8 @@ public class demoMain : MonoBehaviour
         // --- STEP 5: Estimate head pose ---
         if (activeFaceCount > 0 && enableHeadPoseEstimation)
         {
-            faces.SetHeadPoseData(headPoseEstimator.Inference(faceData, activeFaceCount, 
-                                                reusableCaptureFrame, reusableResizedCapture));
+            faces.SetHeadPoseData(headPoseEstimator.Inference(faceData, activeFaceCount,
+                reusableCaptureFrame, reusableResizedCapture));
         }
 
         // --- STEP 6: Detect active speakers ---
@@ -356,33 +358,39 @@ public class demoMain : MonoBehaviour
         {
             float[] audioBuffer = audioCapture.getBuffer();
             var frameHistories = faces.GetFrameHistories();
-
             if (frameHistories.Count > 0)
             {
                 faces.SetSpeakingScores(activeSpeakerDetector.DetectSpeakers(frameHistories, audioBuffer));
             }
         }
 
-        // --- STEP 7: Update engagement state ---
-        if (engagementModule != null)
+        // --- STEP 7: Update engagement state (BRANCHED LOGIC) ---
+        var activeTracks = faces.GetActiveTracks();
+
+        if (useNewPolicySystem && newEngagementManager != null)
         {
-            var activeTracks = faces.GetActiveTracks();
-            engagementModule.UpdateEngagement(activeTracks, Time.deltaTime);
+            // NEW SYSTEM: Policy-driven Formula + Behavior Tree
+            // The EngagementManager handles the math, tree, and avatar control internally.
+            newEngagementManager.UpdateEngagement(activeTracks, Time.deltaTime, capture.FrameWidth, capture.FrameHeight);
+        }
+        else if (!useNewPolicySystem && legacyEngagementModule != null)
+        {
+            // LEGACY SYSTEM: Original hardcoded thresholds
+            legacyEngagementModule.UpdateEngagement(activeTracks, Time.deltaTime);
 
             // Visualize engagement state and control avatar
-            if (engagementModule.IsEngaged)
+            if (legacyEngagementModule.IsEngaged)
             {
                 // Draw engagement indicator
-                Cv2.PutText(reusableCaptureFrame, $"ENGAGED: ID {engagementModule.EngagedTrackId}", 
-                    new OpenCvSharp.Point(10, 100), 
+                Cv2.PutText(reusableCaptureFrame, $"ENGAGED: ID {legacyEngagementModule.EngagedTrackId}",
+                    new OpenCvSharp.Point(10, 100),
                     HersheyFonts.HersheySimplex, textScale, new Scalar(0, 255, 0), textThickness);
 
                 // Highlight engaged user with green box
-                var engagedFace = engagementModule.GetEngagedFace();
+                var engagedFace = legacyEngagementModule.GetEngagedFace();
                 if(engagedFace != null)
                 {
                     Cv2.Rectangle(reusableCaptureFrame, engagedFace.OriginalRect, new Scalar(0, 255, 0), 3);
-
                     // Send face position to avatar
                     if (avatarController != null)
                     {
@@ -412,7 +420,6 @@ public class demoMain : MonoBehaviour
     // =========================================================================
     // PERFORMANCE UI
     // =========================================================================
-
     /// <summary>
     /// Updates the rolling average frame time and FPS.
     /// </summary>
@@ -432,9 +439,9 @@ public class demoMain : MonoBehaviour
                 count++;
             }
         }
-
         float avgFrameTime = count > 0 ? sum / count : frameTimeMs;
         float currentFPS = avgFrameTime > 0 ? 1000f / avgFrameTime : 0f;
+
         performanceString = $"{frameTimeMs:F1}ms | {currentFPS:F0} FPS | {numFaces} faces";
     }
 
@@ -447,7 +454,6 @@ public class demoMain : MonoBehaviour
         Cv2.PutText(frame, performanceString,
             new OpenCvSharp.Point(statsPosition.x + 1, statsPosition.y + 1),
             HersheyFonts.HersheySimplex, textScale, new Scalar(0, 0, 0), textThickness);
-
         // Text
         Cv2.PutText(frame, performanceString,
             new OpenCvSharp.Point(statsPosition.x, statsPosition.y),
@@ -457,7 +463,6 @@ public class demoMain : MonoBehaviour
     // =========================================================================
     // UNITY LIFECYCLE: ONDESTROY
     // =========================================================================
-
     /// <summary>
     /// Cleans up all resources when the application exits.
     /// </summary>
