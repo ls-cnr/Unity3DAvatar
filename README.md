@@ -1,6 +1,10 @@
 # Unity3DAvatar: Multi Modal Engagement
 
-> Please also check out our paper: [Stefano Monfalcone, Gabriele Ragusa, Giovanna Runfola, Irene Maria Genovese, Agnese Augello, Silvia Franchini and Luca Sabatucci, **From Perception to Social Behaviour: An Adaptive Engagement Pipeline for 3D Avatars**, *Proceedings of the ReDH - Rethinking the Future of Digital Humanities through Ethics and Artificial Consciousness co-located with the 24th International Conference of the Italian Association for Artificial Intelligence (AIxIA 2026) Perugia, Italy, October 8, 2026.*](https://ceur-ws.org/Vol-4314/ReDH3.pdf)
+Please also check out our paper: 
+
+S. Monfalcone, G. Ragusa, G. Runfola, I. M. Genovese, A. Augello, S. Franchini and L. Sabatucci, **From Perception to Social Behaviour: An Adaptive Engagement Pipeline for 3D Avatars**, *Proceedings of the ReDH - Rethinking the Future of Digital Humanities through Ethics and Artificial Consciousness co-located with the 24th International Conference of the Italian Association for Artificial Intelligence (AIxIA 2026) Perugia, Italy, October 8, 2026.*
+
+[[pdf](https://ceur-ws.org/Vol-4314/ReDH3.pdf)] [[scholar](https://scholar.google.com/scholar?hl=it&as_sdt=0%2C5&q=From+Perception+to+Social+Behaviour%3A+An+Adaptive+Engagement+Pipeline+for+3D+Avatars&btnG=)]
 ## Overview
 
 The project's goal is to build a system that allows a 3D Avatar to look at a specific user that is targeted as the "engaged" user. The targeting logic is managed through a Behavior Tree (BT). The following software is needed to replicate the project on your machine:
